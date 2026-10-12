@@ -228,7 +228,7 @@ UNLOCK TABLES;
 /*!50001 SET character_set_results     = utf8mb4 */;
 /*!50001 SET collation_connection      = utf8mb4_0900_ai_ci */;
 /*!50001 CREATE ALGORITHM=UNDEFINED */
-/*!50013 DEFINER=`root`@`localhost` SQL SECURITY DEFINER */
+/*!50013 SQL SECURITY INVOKER */
 /*!50001 VIEW `student_acadmic_view` AS select `students`.`first_name` AS `first_name`,`students`.`last_name` AS `last_name`,`department`.`department_name` AS `department_name`,`courses`.`course_code` AS `course_code`,`courses`.`course_name` AS `course_name`,`lecturers`.`first_name` AS `lecturer_first_name`,`lecturers`.`last_name` AS `lecturer_last_name`,`courses`.`credit_units` AS `credit_units`,`enrollments`.`grade` AS `grade`,`enrollments`.`enrollment_date` AS `enrollment_date` from ((((`students` join `department` on((`students`.`department_id` = `department`.`department_id`))) join `enrollments` on((`students`.`student_id` = `enrollments`.`student_id`))) join `courses` on((`enrollments`.`course_id` = `courses`.`course_id`))) join `lecturers` on((`courses`.`lecturer_id` = `lecturers`.`lecturer_id`))) */;
 /*!50001 SET character_set_client      = @saved_cs_client */;
 /*!50001 SET character_set_results     = @saved_cs_results */;
