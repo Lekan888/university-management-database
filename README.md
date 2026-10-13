@@ -8,6 +8,12 @@ A MySQL learning project modeling students, departments, lecturers, courses, and
 | --- | --- | --- |
 | `university_management.sql` | Table definitions, constraints, seed data, and the academic view | 1: import into a new database |
 | `verify.sql` | Read-only checks with actual and expected values | 2: run after a successful import |
+| `reports.sql` | Six read-only reporting queries with stable IDs and explicit ordering | 3: run on the imported fixture |
+| `tests/regression.sql` | Constraint, optional-link and rollback tests; temporary test procedure | 4: disposable test schema only |
+| `scripts/check_verification.py` | Converts MySQL TSV verification results into a process exit status | Automated verification |
+| `.github/workflows/mysql.yml` | MySQL 8.0 import, reports, behavior tests and failure-detection checks | GitHub Actions |
+| `docs/portfolio.md` | Resume bullets, project descriptions and a short case study | Portfolio copy |
+| `docs/project-walkthrough.md` | Short demonstration and interview prompts | Presentation guide |
 | `README.md` | Setup instructions, expected results, constraint checks, and project limitations | Read before importing |
 
 The dump already handles its internal loading order. Do not run its table sections individually.
@@ -34,6 +40,9 @@ CREATE DATABASE university_management_demo
 USE university_management_demo;
 SOURCE university_management.sql;
 SOURCE verify.sql;
+SOURCE reports.sql;
+SOURCE tests/regression.sql;
+SOURCE verify.sql; -- Confirm the fixture after rollback and test-procedure cleanup.
 ```
 
 Create a **new disposable database**. If creation fails because the name already exists, stop and choose another name before importing. The dump contains DROP TABLE statements: rerunning it in an existing target replaces its six tables and their data. It contains no CREATE DATABASE or USE statement, so the selected database determines where it is imported. Review the import output for errors before running verification.
@@ -57,6 +66,12 @@ SOURCE is a command for the `mysql` client, including when it is launched from W
 Implemented constraints include primary keys, AUTO_INCREMENT, unique department names, course codes and student/lecturer emails, a composite UNIQUE key on `(student_id, course_id)`, CHECK constraints on course credits (1–6) and lecturer salary (>0), and selected NOT NULL columns. The enrollment uniqueness constraint prevents duplicate **non-null** student-course pairs; both reference columns currently allow NULL.
 
 The view is named **`student_acadmic_view`** in the original database; this spelling is retained for compatibility. It joins students, department, enrollments, courses, and lecturers to display student names, department, course, lecturer, credits, grade, and enrollment date. It does not expose student or enrollment IDs.
+
+## Reporting queries
+
+[`reports.sql`](reports.sql) contains six runnable reports: an enrollment roster with stable IDs and optional links, course demand, student course load, department coverage, grade distribution and above-average enrollment counts. The roster retains nullable links; the original `student_acadmic_view` still uses INNER JOINs and can omit such events. Department counts are aggregated separately before joining, avoiding inflated totals.
+
+Expected fixture totals are 24 enrollments and 72 recorded credit units. Six students have three enrollments, above the fixture average of 2.4. These reports do not calculate GPA or model semesters.
 
 ## Verification and expected results
 
@@ -105,6 +120,22 @@ SELECT grade FROM enrollments WHERE enrollment_id = 1; -- A again
 
 These examples demonstrate engine transaction behavior; they do not implement a new application workflow. Run `verify.sql` again afterward to confirm the fixture remains intact.
 
+## Automated verification and behavioral tests
+
+The [GitHub Actions workflow](.github/workflows/mysql.yml) imports the dump into a fresh MySQL 8.0 container, checks all 27 existing verification results, runs all six reports, and executes [behavioral tests](tests/regression.sql). It also changes one fixture value deliberately, verifies that the gate fails, restores the value, and checks the clean fixture again.
+
+The read-only `verify.sql` remains usable in Workbench. For automation, [`scripts/check_verification.py`](scripts/check_verification.py) reads the `mysql --batch --raw --skip-column-names` output. It returns a nonzero exit code for FAIL, a mismatched expected/actual value, duplicate or missing checks, malformed rows, or missing database metadata. It requires Python 3 and only its standard library.
+
+`tests/regression.sql` needs CREATE ROUTINE, ALTER ROUTINE and EXECUTE privileges in addition to the original import permissions. Run it only in a disposable schema. It creates a temporary test procedure, exercises constraints and optional relationships, rolls back its data changes and drops the procedure after success. The exception handler rolls back before propagating an error; a failed test can leave the procedure behind. Auto-increment counters can advance even after rollback.
+
+Run the verification-gate unit tests independently:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_*.py' -v
+```
+
+[Portfolio copy](docs/portfolio.md) and a [short interview walkthrough](docs/project-walkthrough.md) describe the implemented scope and future work separately.
+
 ## Portfolio description
 
 Designed a six-table MySQL university database with six foreign keys and 62 seeded records. Modeled student-course enrollment with a composite uniqueness constraint and built a five-table academic view. Verified the documented import on MySQL 8.0.46 with a non-root account and 27 read-only checks; demonstrated duplicate rejection, foreign-key enforcement, CHECK constraints, and transaction rollback.
@@ -115,7 +146,7 @@ The committed dump has **no stored procedure/function or trigger definitions**. 
 
 Enrollment references, credit units, salary, emails, and other relationships allow NULL where the schema permits it. There is no grade-domain CHECK constraint or semester model; the composite enrollment key also prevents recording the same student-course pair in a later term. Seed spellings such as `Business Adminidtration` are retained from the original data.
 
-Possible later improvements: recover and test the original procedures/audit triggers, strengthen required fields and grade validation, add a correctly named view with stable IDs, model semesters, and add more reporting examples. These are future changes, not current features.
+Possible later improvements: recover and test the original procedures/audit triggers, strengthen required fields and grade validation, add a correctly named view with stable IDs, model semesters, and extend reporting for that semester model. These are future changes, not current features.
 
 ## Validation record
 
